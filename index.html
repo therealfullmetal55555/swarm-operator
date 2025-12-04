@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SWARM // OPERATOR — Autonomous Multi-Agent Mission Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Bebas+Neue&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --void: #080806;
+    --surface: #0c0d10;
+    --surface-2: #121417;
+    --border: rgba(255, 255, 255, 0.08);
+    --border-glow: rgba(255, 255, 255, 0.25);
+    --fg: #ffffff;
+    --fg-muted: rgba(255, 255, 255, 0.52);
+    --fg-dim: rgba(255, 255, 255, 0.28);
+    --acc-green: #ffffff;
+    --acc-cyan: rgba(255, 255, 255, 0.75);
+    --acc-amber: rgba(255, 255, 255, 0.88);
+    --acc-red: #d9534f;
+    --mono: 'Space Mono', monospace;
+    --sans: 'Inter', sans-serif;
+    --display: 'Archivo Black', sans-serif;
+    --num: 'Bebas Neue', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; }
+
+  body {
+    background: var(--void);
+    color: var(--fg);
+    font-family: var(--mono);
+    font-size: 12px;
+    display: flex;
+    flex-direction: column;
+    -webkit-font-smoothing: antialiased;
+    background-image: 
+      repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.015) 0 1px, transparent 1px 32px),
+      repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.015) 0 1px, transparent 1px 32px);
+  }
+
+  /* ── TOP NAV BAR ─────────────────────────────────────── */
+  header {
+    height: 52px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    background: rgba(12, 13, 16, 0.85);
+    backdrop-filter: blur(14px);
+    z-index: 100;
+  }
+
+  .brand-group {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .brand {
+    font-family: var(--display);
+    font-size: 14px;
+    letter-spacing: -0.02em;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-transform: uppercase;
+  }
+  .brand .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #ffffff;
+    animation: pulse 2.4s infinite;
+  }
+  @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.3; transform: scale(0.85); } }
+
+  .version-tag {
+    font-size: 10px;
+    color: var(--fg-dim);
+    letter-spacing: 0.1em;
+    border: 1px solid var(--border);
+    padding: 2px 7px;
+  }
+
+  /* Telemetry Bar */
+  .telemetry-strip {
+    display: flex;
+    gap: 28px;
+    align-items: center;
+  }
+  .telem-item {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+  .telem-val {
+    font-family: var(--num);
+    font-size: 18px;
+    line-height: 1;
+    color: #ffffff;
+  }
+  .telem-lbl {
+    font-size: 8.5px;
+    color: var(--fg-muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  button.icon-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--fg-muted);
+    padding: 6px 12px;
+    font-family: var(--mono);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  button.icon-btn:hover {
+    color: var(--fg);
+    border-color: var(--fg-muted);
+  }
+
+  /* ── MAIN WORKSPACE (3-COLUMN LAYOUT) ───────────────── */
+  main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 320px 1fr 420px;
+    min-height: 0;
+  }
+
+  /* LEFT: Mission Director */
+  aside.panel-left {
+    border-right: 1px solid var(--border);
+    background: rgba(12, 14, 16, 0.4);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    padding: 20px;
+  }
+
+  .panel-title {
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--fg-muted);
+    margin-bottom: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .preset-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 14px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  .preset-card:hover {
+    border-color: rgba(255, 255, 255, 0.25);
+    background: var(--surface-2);
+  }
+  .preset-card.active {
+    border-color: #ffffff;
+    box-shadow: none;
+    background: var(--surface-2);
+  }
+  .preset-cat {
+    font-size: 8.5px;
+    letter-spacing: 0.14em;
+    color: var(--fg-muted);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+  .preset-name {
+    font-size: 12px;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.35;
+    margin-bottom: 8px;
+  }
+  .preset-desc {
+    font-size: 11px;
+    color: var(--fg-muted);
+    line-height: 1.5;
+    font-family: var(--sans);
+    font-weight: 300;
+  }
+
+  .custom-mission-box {
+    margin-top: auto;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+  textarea.custom-prompt {
+    width: 100%;
+    height: 70px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--fg);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 10px;
+    resize: none;
+    margin-bottom: 10px;
+  }
+  textarea.custom-prompt:focus {
+    outline: none;
+    border-color: rgba(255, 255, 255, 0.4);
+  }
+
+  button.launch-btn {
+    width: 100%;
+    padding: 12px;
+    background: #ffffff;
+    color: #080806;
+    border: none;
+    border-radius: 2px;
+    font-family: var(--display);
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: background 0.2s;
+  }
+  button.launch-btn:hover {
+    background: #d8d8d8;
+  }
+  button.launch-btn:disabled {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.3);
+    cursor: not-allowed;
+  }
+
+  /* CENTER: Swarm Canvas & Live Terminal */
+  section.center-stage {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    position: relative;
+  }
+
+  /* Visual Graph Area */
+  .swarm-graph-wrap {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: #07090b;
+    border-bottom: 1px solid var(--border);
+  }
+  canvas#swarmCanvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  /* Live Terminal Area */
+  .terminal-wrap {
+    height: 240px;
+    background: var(--void);
+    display: flex;
+    flex-direction: column;
+  }
+  .term-header {
+    height: 30px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--fg-muted);
+  }
+  .term-feed {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 16px;
+    font-size: 11px;
+    line-height: 1.6;
+  }
+  .log-row {
+    margin-bottom: 4px;
+    display: flex;
+    gap: 10px;
+    font-family: var(--mono);
+  }
+  .log-time { color: var(--fg-dim); flex-shrink: 0; }
+  .log-tag { font-weight: 700; flex-shrink: 0; padding: 0 4px; border-radius: 2px; color: #fff; }
+  .log-tag.orc { color: #ffffff; }
+  .log-tag.sct { color: rgba(255, 255, 255, 0.75); }
+  .log-tag.syn { color: rgba(255, 255, 255, 0.9); }
+  .log-tag.adt { color: rgba(255, 255, 255, 0.6); }
+  .log-msg { color: var(--fg); word-break: break-word; }
+
+  /* RIGHT: Artifact Inspector */
+  aside.panel-right {
+    border-left: 1px solid var(--border);
+    background: rgba(12, 14, 16, 0.4);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .artifact-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .art-tab {
+    flex: 1;
+    padding: 10px;
+    text-align: center;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--fg-muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+  }
+  .art-tab.active {
+    color: #ffffff;
+    border-bottom-color: #ffffff;
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .artifact-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    font-family: var(--sans);
+    font-size: 12px;
+    line-height: 1.6;
+    color: #cfd8d2;
+  }
+  .artifact-body h1 {
+    font-family: var(--display);
+    font-size: 16px;
+    color: #fff;
+    margin-bottom: 12px;
+    letter-spacing: -0.02em;
+  }
+  .artifact-body h2 {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: #ffffff;
+    margin: 18px 0 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .artifact-body pre {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 12px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    overflow-x: auto;
+    margin: 12px 0;
+    color: #a8b8b0;
+  }
+  .artifact-body ul {
+    padding-left: 18px;
+    margin: 8px 0;
+  }
+
+  .artifact-footer {
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--surface);
+  }
+
+  /* Agent Nodes Overlay on Canvas */
+  .agent-node-badge {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    background: rgba(12, 13, 16, 0.9);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 8px 12px;
+    min-width: 140px;
+    pointer-events: none;
+    backdrop-filter: blur(8px);
+    transition: border-color 0.3s;
+  }
+  .agent-node-badge.thinking {
+    border-color: rgba(255, 255, 255, 0.4);
+    box-shadow: none;
+  }
+  .agent-node-badge.active {
+    border-color: #ffffff;
+    box-shadow: none;
+  }
+  .node-code {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: #ffffff;
+  }
+  .node-name {
+    font-family: var(--display);
+    font-size: 11px;
+    color: #fff;
+    margin-top: 2px;
+  }
+  .node-status {
+    font-size: 8px;
+    color: var(--fg-muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand-group">
+    <div class="brand">
+      <span class="dot"></span>
+      SWARM // OPERATOR
+    </div>
+    <span class="version-tag">AUTONOMOUS MISSION CONTROL · V2.4</span>
+  </div>
+
+  <div class="telemetry-strip">
+    <div class="telem-item">
+      <span class="telem-val" id="valTokens">0</span>
+      <span class="telem-lbl">Tokens Consumed</span>
+    </div>
+    <div class="telem-item">
+      <div class="telem-val" id="valElapsed">0.0s</div>
+      <span class="telem-lbl">Execution Elapsed</span>
+    </div>
+    <div class="telem-item">
+      <span class="telem-val" id="valCost">$0.000</span>
+      <span class="telem-lbl">Blended Compute Cost</span>
+    </div>
+    <div class="telem-item">
+      <span class="telem-val" id="valAgents">4/4</span>
+      <span class="telem-lbl">Agent Swarm Ready</span>
+    </div>
+  </div>
+
+  <div class="header-actions">
+    <button class="icon-btn" id="btnAudio" title="Toggle audio feedback">AUDIO: ON</button>
+    <a href="https://github.com/millymilly29" target="_blank" style="text-decoration:none;">
+      <button class="icon-btn">GITHUB ↗</button>
+    </a>
+  </div>
+</header>
+
+<main>
+  <!-- LEFT: MISSION INTAKE -->
+  <aside class="panel-left">
+    <div class="panel-title">
+      <span>01 // Selected Directive</span>
+      <span style="color:#ffffff;">READY</span>
+    </div>
+
+    <div id="presetsContainer"></div>
+
+    <div class="custom-mission-box">
+      <div class="panel-title"><span>Custom Directive Input</span></div>
+      <textarea class="custom-prompt" id="customInput" placeholder="Direct the swarm: e.g. Audit API rate limits, scrape marketplace, build telegram bot..."></textarea>
+      <button class="launch-btn" id="btnLaunch">
+        <span>Dispatch Swarm</span>
+        <span style="font-size:14px;">→</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- CENTER: CANVAS GRAPH & TERMINAL -->
+  <section class="center-stage">
+    <div class="swarm-graph-wrap" id="canvasContainer">
+      <canvas id="swarmCanvas"></canvas>
+      <!-- HTML overlay nodes for agents -->
+      <div id="nodesOverlay"></div>
+    </div>
+
+    <div class="terminal-wrap">
+      <div class="term-header">
+        <span>02 // Multi-Agent Telemetry Stream</span>
+        <span id="termStatus">STANDBY</span>
+      </div>
+      <div class="term-feed" id="termFeed">
+        <div class="log-row">
+          <span class="log-time">00:00:00</span>
+          <span class="log-tag orc">SYS</span>
+          <span class="log-msg">Swarm orchestrator initialized. 4 autonomous personas online. Awaiting mission directive.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- RIGHT: ARTIFACT INSPECTOR -->
+  <aside class="panel-right">
+    <div class="artifact-tabs">
+      <div class="art-tab active" data-tab="md">Report Document</div>
+      <div class="art-tab" data-tab="json">Synthesized JSON</div>
+      <div class="art-tab" data-tab="arch">Swarm Graph</div>
+    </div>
+
+    <div class="artifact-body" id="artifactContent">
+      <h1>Awaiting Mission Execution</h1>
+      <p style="color:var(--fg-muted); margin-bottom:16px;">Select a directive on the left panel and click <strong>Dispatch Swarm</strong> to trigger the autonomous reasoning loop.</p>
+      
+      <h2>System Capabilities</h2>
+      <ul>
+        <li><strong>DAG Decomposition:</strong> Automatically breaks down high-level business goals into dependent subtasks.</li>
+        <li><strong>Multi-Persona Coordination:</strong> Specialized agents cross-verify and critique deliverables in real time.</li>
+        <li><strong>Live Telemetry:</strong> Real-time tracking of simulated tokens, execution duration, and unit cost.</li>
+      </ul>
+    </div>
+
+    <div class="artifact-footer">
+      <span style="font-size:9.5px; color:var(--fg-muted);" id="artFooterStatus">NO ARTIFACT</span>
+      <button class="icon-btn" id="btnCopyArtifact">COPY OUTPUT</button>
+    </div>
+  </aside>
+</main>
+
+<script src="engine/swarm-bus.js"></script>
+<script src="engine/agents.js"></script>
+<script>
+  // ── SOUND SYNTHESIZER (WEB AUDIO API) ──────────────────────
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  let soundEnabled = true;
+
+  function playBlip(freq = 600, type = 'sine', duration = 0.04) {
+    if (!soundEnabled || !audioCtx) return;
+    try {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + duration);
+    } catch(e){}
+  }
+
+  document.getElementById('btnAudio').addEventListener('click', () => {
+    soundEnabled = !soundEnabled;
+    document.getElementById('btnAudio').textContent = soundEnabled ? 'AUDIO: ON' : 'AUDIO: OFF';
+  });
+
+  // ── SWARM INITIALIZATION ──────────────────────────────────
+  const bus = new SwarmEventBus();
+  const controller = new SwarmMissionController(bus);
+  let selectedPreset = MISSION_PRESETS[0];
+
+  // Render presets
+  const presetsContainer = document.getElementById('presetsContainer');
+  MISSION_PRESETS.forEach((p, idx) => {
+    const card = document.createElement('div');
+    card.className = `preset-card ${idx === 0 ? 'active' : ''}`;
+    card.innerHTML = `
+      <div class="preset-cat">${p.category}</div>
+      <div class="preset-name">${p.label}</div>
+      <div class="preset-desc">${p.prompt}</div>
+    `;
+    card.addEventListener('click', () => {
+      document.querySelectorAll('.preset-card').forEach(c => c.classList.remove('active'));
+      card.classList.add('active');
+      selectedPreset = p;
+      document.getElementById('customInput').value = '';
+      playBlip(750);
+    });
+    presetsContainer.appendChild(card);
+  });
+
+  // ── CANVAS VISUAL GRAPH ────────────────────────────────────
+  const canvas = document.getElementById('swarmCanvas');
+  const ctx = canvas.getContext('2d');
+  const overlay = document.getElementById('nodesOverlay');
+
+  const nodes = [
+    { key: 'orchestrator', name: 'ORCHESTRATOR', code: 'ORC-01', x: 0.5, y: 0.22, color: '#ffffff' },
+    { key: 'scout', name: 'INTEL SCOUT', code: 'SCT-02', x: 0.22, y: 0.65, color: 'rgba(255, 255, 255, 0.75)' },
+    { key: 'executor', name: 'SYNTHESIZER', code: 'SYN-03', x: 0.5, y: 0.78, color: '#ffffff' },
+    { key: 'auditor', name: 'CRITIC AUDITOR', code: 'ADT-04', x: 0.78, y: 0.65, color: 'rgba(255, 255, 255, 0.85)' }
+  ];
+
+  let particles = [];
+
+  function resizeCanvas() {
+    canvas.width = canvas.parentElement.clientWidth;
+    canvas.height = canvas.parentElement.clientHeight;
+    renderOverlayBadges();
+  }
+  window.addEventListener('resize', resizeCanvas);
+
+  function renderOverlayBadges() {
+    overlay.innerHTML = '';
+    nodes.forEach(n => {
+      const el = document.createElement('div');
+      el.className = 'agent-node-badge';
+      el.id = 'badge_' + n.key;
+      el.style.left = (n.x * canvas.width) + 'px';
+      el.style.top = (n.y * canvas.height) + 'px';
+      el.innerHTML = `
+        <div class="node-code">${n.code}</div>
+        <div class="node-name">${n.name}</div>
+        <div class="node-status" id="status_${n.key}">IDLE</div>
+      `;
+      overlay.appendChild(el);
+    });
+  }
+
+  function spawnParticle(fromNode, toNode, color) {
+    particles.push({
+      startX: fromNode.x * canvas.width,
+      startY: fromNode.y * canvas.height,
+      endX: toNode.x * canvas.width,
+      endY: toNode.y * canvas.height,
+      progress: 0,
+      speed: 0.015 + Math.random() * 0.01,
+      color: '#ffffff'
+    });
+  }
+
+  function drawGraph() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw connecting edges
+    const edges = [
+      [0, 1], [0, 2], [0, 3], [1, 2], [2, 3]
+    ];
+    ctx.lineWidth = 1;
+    edges.forEach(([a, b]) => {
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.beginPath();
+      ctx.moveTo(nodes[a].x * canvas.width, nodes[a].y * canvas.height);
+      ctx.lineTo(nodes[b].x * canvas.width, nodes[b].y * canvas.height);
+      ctx.stroke();
+    });
+
+    // Update & draw particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.progress += p.speed;
+      const curX = p.startX + (p.endX - p.startX) * p.progress;
+      const curY = p.startY + (p.endY - p.startY) * p.progress;
+
+      ctx.fillStyle = '#ffffff';
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+      ctx.beginPath();
+      ctx.arc(curX, curY, 2, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (p.progress >= 1) {
+        particles.splice(i, 1);
+      }
+    }
+
+    requestAnimationFrame(drawGraph);
+  }
+
+  setTimeout(() => {
+    resizeCanvas();
+    drawGraph();
+  }, 100);
+
+  // ── EVENT LISTENERS & TELEMETRY ────────────────────────────
+  const termFeed = document.getElementById('termFeed');
+
+  function addLog(tag, tagClass, text) {
+    const row = document.createElement('div');
+    row.className = 'log-row';
+    const now = new Date().toTimeString().substring(0, 8);
+    row.innerHTML = `
+      <span class="log-time">${now}</span>
+      <span class="log-tag ${tagClass}">${tag}</span>
+      <span class="log-msg">${text}</span>
+    `;
+    termFeed.appendChild(row);
+    termFeed.scrollTop = termFeed.scrollHeight;
+  }
+
+  bus.on('*', (frame) => {
+    // Update Telemetry Header
+    document.getElementById('valTokens').textContent = bus.telemetry.totalTokens.toLocaleString();
+    document.getElementById('valCost').textContent = '$' + bus.telemetry.estimatedCost.toFixed(4);
+    if (bus.telemetry.startTime) {
+      document.getElementById('valElapsed').textContent = (bus.getElapsed() / 1000).toFixed(1) + 's';
+    }
+  });
+
+  bus.on('MISSION_START', (f) => {
+    playBlip(520, 'triangle', 0.1);
+    addLog('ORC', 'orc', `Mission started: ${f.data.mission}`);
+    document.getElementById('termStatus').textContent = 'ACTIVE';
+    document.getElementById('termStatus').style.color = '#ffffff';
+  });
+
+  bus.on('AGENT_STATE_CHANGE', (f) => {
+    const { agentId, state, action } = f.data;
+    const shortKey = agentId.replace('agent_', '');
+    const badge = document.getElementById('badge_' + shortKey);
+    const statusEl = document.getElementById('status_' + shortKey);
+
+    if (badge && statusEl) {
+      statusEl.textContent = state;
+      badge.className = 'agent-node-badge ' + (state === 'THINKING' ? 'thinking' : (state === 'DONE' ? 'active' : ''));
+    }
+
+    if (state === 'THINKING') {
+      playBlip(880, 'sine', 0.05);
+      // emit particle from orchestrator to active agent
+      const targetNode = nodes.find(n => n.key === shortKey);
+      if (targetNode && shortKey !== 'orchestrator') {
+        spawnParticle(nodes[0], targetNode, '#ffffff');
+      }
+      addLog(shortKey.substring(0, 3).toUpperCase(), shortKey.substring(0, 3), action);
+    }
+  });
+
+  bus.on('TOOL_INVOKED', (f) => {
+    playBlip(1200, 'square', 0.03);
+    const shortKey = f.data.agentId.replace('agent_', '');
+    addLog('TOOL', shortKey.substring(0, 3), `[${f.data.tool}] Executing query parameters...`);
+  });
+
+  bus.on('ARTIFACT_GENERATED', (f) => {
+    playBlip(440, 'triangle', 0.15);
+    window.currentArtifact = f.data;
+    renderArtifact('md');
+    document.getElementById('artFooterStatus').textContent = 'VERIFIED ARTIFACT GENERATED';
+    document.getElementById('artFooterStatus').style.color = '#ffffff';
+  });
+
+  bus.on('MISSION_COMPLETE', (f) => {
+    playBlip(880, 'sine', 0.2);
+    document.getElementById('termStatus').textContent = 'COMPLETED';
+    document.getElementById('btnLaunch').disabled = false;
+    document.getElementById('btnLaunch').innerHTML = '<span>Dispatch Swarm</span> <span>→</span>';
+    addLog('SYS', 'orc', `Mission successfully completed in ${(f.data.totalDurationMs / 1000).toFixed(2)}s.`);
+  });
+
+  // ── ARTIFACT TABS ──────────────────────────────────────────
+  function renderArtifact(type) {
+    const art = window.currentArtifact;
+    const container = document.getElementById('artifactContent');
+    if (!art) return;
+
+    if (type === 'md') {
+      container.innerHTML = `
+        <h1>${art.title}</h1>
+        <p style="color:rgba(255,255,255,0.7); font-size:10px; margin-bottom:14px;">STATUS: VERIFIED // ${art.generatedAt}</p>
+        <pre>${art.markdown.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
+      `;
+    } else if (type === 'json') {
+      container.innerHTML = `
+        <h1>Synthesized JSON Object</h1>
+        <pre>${JSON.stringify(art.rawJson, null, 2)}</pre>
+      `;
+    } else if (type === 'arch') {
+      container.innerHTML = `
+        <h1>Swarm Architecture Trace</h1>
+        <pre>
+DAG Coordination Topology:
+[ORCHESTRATOR] ──► [SCOUT] ──► [SYNTHESIZER] ──► [CRITIC AUDITOR]
+      ▲                                                  │
+      └───────────────── Feedback Loop ──────────────────┘
+- Concurrency Model: Event-driven pub/sub bus
+- Memory Persistence: Episodic in-memory buffer
+- Latency Budget: Sub-200ms node handover
+        </pre>
+      `;
+    }
+  }
+
+  document.querySelectorAll('.art-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.art-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      renderArtifact(tab.getAttribute('data-tab'));
+      playBlip(620);
+    });
+  });
+
+  document.getElementById('btnCopyArtifact').addEventListener('click', () => {
+    if (!window.currentArtifact) return;
+    navigator.clipboard.writeText(window.currentArtifact.markdown);
+    const btn = document.getElementById('btnCopyArtifact');
+    btn.textContent = 'COPIED!';
+    setTimeout(() => { btn.textContent = 'COPY OUTPUT'; }, 1500);
+    playBlip(900);
+  });
+
+  // ── LAUNCH BUTTON HANDLER ──────────────────────────────────
+  document.getElementById('btnLaunch').addEventListener('click', () => {
+    const customPrompt = document.getElementById('customInput').value.trim();
+    const btn = document.getElementById('btnLaunch');
+    btn.disabled = true;
+    btn.innerHTML = '<span>Swarm Active...</span>';
+
+    const mission = customPrompt.length > 0 ? customPrompt : selectedPreset;
+    controller.runMission(mission);
+  });
+</script>
+
+</body>
+</html>
